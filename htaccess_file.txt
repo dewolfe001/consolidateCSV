@@ -1,0 +1,176 @@
+# AI CSV Consolidator - Apache Configuration
+# Security and URL rewriting rules
+
+# Enable rewrite engine
+RewriteEngine On
+
+# Security Headers
+<IfModule mod_headers.c>
+    # Prevent framing and XSS attacks
+    Header always set X-Frame-Options DENY
+    Header always set X-Content-Type-Options nosniff
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Content Security Policy
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.stripe.com"
+    
+    # HSTS (HTTP Strict Transport Security) - only enable on HTTPS
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+</IfModule>
+
+# Hide sensitive files and directories
+<FilesMatch "\.(env|log|ini|conf)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Protect configuration and sensitive directories
+RedirectMatch 404 ^/(temp|data|logs|vendor|includes)/.*$
+RedirectMatch 404 ^/\.(env|git|htaccess|htpasswd).*$
+
+# Protect PHP files in includes directory
+<Directory "includes">
+    Order Allow,Deny
+    Deny from all
+</Directory>
+
+# Protect temp directory
+<Directory "temp">
+    Order Allow,Deny
+    Deny from all
+</Directory>
+
+# Protect data directory
+<Directory "data">
+    Order Allow,Deny
+    Deny from all
+</Directory>
+
+# Protect logs directory
+<Directory "logs">
+    Order Allow,Deny
+    Deny from all
+</Directory>
+
+# Allow specific file access
+<Files "index.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
+
+<Files "download.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
+
+<Files "webhook.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
+
+<Files "admin.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
+
+# File upload security
+<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|jsp|asp|sh|cgi)$">
+    # Only allow specific PHP files
+    RewriteCond %{REQUEST_FILENAME} !^.*(index|download|webhook|admin)\.php$
+    RewriteRule ^temp/.*$ - [F,L]
+</FilesMatch>
+
+# Prevent execution of uploaded files
+<Directory "temp/uploads">
+    <FilesMatch "\.php$">
+        Order Allow,Deny
+        Deny from all
+    </FilesMatch>
+    php_flag engine off
+    AddHandler cgi-script .php .pl .py .jsp .asp .sh .cgi
+    Options -ExecCGI
+</Directory>
+
+# Rate limiting (if mod_evasive is available)
+<IfModule mod_evasive24.c>
+    DOSHashTableSize    2048
+    DOSPageCount        10
+    DOSPageInterval     1
+    DOSSiteCount        50
+    DOSSiteInterval     1
+    DOSBlockingPeriod   600
+</IfModule>
+
+# File size limits
+LimitRequestBody 52428800  # 50MB limit
+
+# Compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+# Caching rules
+<IfModule mod_expires.c>
+    ExpiresActive on
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/jpg "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/gif "access plus 1 month"
+    ExpiresByType image/webp "access plus 1 month"
+</IfModule>
+
+# Prevent access to backup files
+<FilesMatch "(^#.*#|\.(bak|config|dist|fla|inc|ini|log|psd|sh|sql|sw[op])|~)$">
+    Order allow,deny
+    Deny from all
+    Satisfy All
+</FilesMatch>
+
+# Custom error pages
+ErrorDocument 404 /index.php
+ErrorDocument 403 /index.php
+ErrorDocument 500 /index.php
+
+# URL Rewriting for clean URLs
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^admin/?$ admin.php [L]
+RewriteRule ^download/(.+)$ download.php?session=$1 [L]
+
+# Force HTTPS in production (uncomment when SSL is configured)
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Prevent access to version control directories
+RedirectMatch 404 /\.git
+RedirectMatch 404 /\.svn
+
+# PHP Security Settings
+<IfModule mod_php7.c>
+    php_flag expose_php off
+    php_flag log_errors on
+    php_flag display_errors off
+    php_flag display_startup_errors off
+    php_flag html_errors off
+    php_flag track_errors off
+    php_flag register_globals off
+    php_flag magic_quotes_gpc off
+    php_flag session.cookie_httponly on
+    php_flag session.cookie_secure on
+    php_flag session.use_only_cookies on
+</IfModule>
+
+# Deny access to files without extension
+<Files "*">
+    Order Deny,Allow
+    Deny from all
+</Files>
+
+# Allow access to specific file types
+<FilesMatch "\.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|mp4|webm|pdf|txt|xml)$">
+    Order Allow,Deny
+    Allow from all
+</FilesMatch>

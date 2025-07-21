@@ -1,0 +1,190 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: csv_consolidator_web
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./temp:/var/www/html/temp
+      - ./data:/var/www/html/data
+      - ./logs:/var/www/html/logs
+      - ./.env:/var/www/html/.env
+    environment:
+      - PHP_ENV=production
+      - PHP_MEMORY_LIMIT=512M
+      - PHP_UPLOAD_MAX_FILESIZE=50M
+      - PHP_POST_MAX_SIZE=50M
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - csv_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: csv_consolidator_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - csv_network
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: csv_consolidator_worker
+    volumes:
+      - ./temp:/var/www/html/temp
+      - ./data:/var/www/html/data
+      - ./logs:/var/www/html/logs
+      - ./.env:/var/www/html/.env
+    environment:
+      - PHP_ENV=production
+      - PHP_MEMORY_LIMIT=1G
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - csv_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: csv_consolidator_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+      - ./temp:/var/www/html/temp:ro
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks:
+      - csv_network
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: csv_consolidator_scheduler
+    volumes:
+      - ./temp:/var/www/html/temp
+      - ./data:/var/www/html/data
+      - ./logs:/var/www/html/logs
+      - ./.env:/var/www/html/.env
+    command: ["php", "/var/www/html/scheduler.php"]
+    environment:
+      - PHP_ENV=production
+    restart: unless-stopped
+    networks:
+      - csv_network
+
+volumes:
+  redis_data:
+
+networks:
+  csv_network:
+    driver: bridge
+
+---
+# Dockerfile
+FROM php:8.1-fpm-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    curl \
+    sqlite \
+    sqlite-dev \
+    zip \
+    unzip \
+    git \
+    nginx \
+    supervisor
+
+# Install PHP extensions
+RUN docker-php-ext-install \
+    pdo_sqlite \
+    curl \
+    mbstring
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Set working directory
+WORKDIR /var/www/html
+
+# Copy application files
+COPY . .
+
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html && \
+    chmod -R 755 /var/www/html && \
+    chmod -R 777 temp data logs
+
+# Create required directories
+RUN mkdir -p temp/uploads temp/processing temp/results temp/logs && \
+    chown -R www-data:www-data temp data logs
+
+# Copy supervisor configuration
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Copy nginx configuration
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+
+# Expose port
+EXPOSE 80 443
+
+# Start supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+
+---
+# Dockerfile.worker
+FROM php:8.1-cli-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    curl \
+    sqlite \
+    sqlite-dev \
+    zip \
+    unzip
+
+# Install PHP extensions
+RUN docker-php-ext-install \
+    pdo_sqlite \
+    curl \
+    mbstring
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Set working directory
+WORKDIR /var/www/html
+
+# Copy application files
+COPY . .
+
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# Set permissions
+RUN chmod +x process_job.php cleanup.php
+
+# Create required directories
+RUN mkdir -p temp/uploads temp/processing temp/results temp/logs
+
+# Run worker
+CMD ["php", "/var/www/html/worker.php"]
