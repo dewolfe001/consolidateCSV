@@ -25,6 +25,7 @@ class AICSVConsolidator {
     private $allRecords = [];
     private $duplicateGroups = [];
     private $consolidatedRecords = [];
+    private $allColumns = [];
     private $stats = [
         'totalOriginal' => 0,
         'duplicatesFound' => 0,
@@ -157,6 +158,8 @@ ENV;
                 $this->allRecords[] = $record;
             }
         }
+
+        $this->unifyRecordColumns();
         
         $this->stats['totalOriginal'] = count($this->allRecords);
         $this->log("✅ Loaded {$this->stats['totalOriginal']} records from " . count($files) . " files", 'info');
@@ -167,18 +170,20 @@ ENV;
         
         if (($handle = fopen($filePath, "r")) !== FALSE) {
             $headers = fgetcsv($handle);
-            
+
             // Clean headers
             $headers = array_map('trim', $headers);
+            $this->allColumns = array_unique(array_merge($this->allColumns, $headers));
             
             while (($data = fgetcsv($handle)) !== FALSE) {
-                if (count($data) === count($headers)) {
-                    $record = array_combine($headers, $data);
-                    
-                    // Skip empty records
-                    if (!empty(trim($record[$this->config['term_column']] ?? ''))) {
-                        $records[] = $record;
-                    }
+                $record = [];
+                foreach ($headers as $index => $col) {
+                    $record[$col] = $data[$index] ?? '';
+                }
+
+                // Skip empty records
+                if (!empty(trim($record[$this->config['term_column']] ?? ''))) {
+                    $records[] = $record;
                 }
             }
             
@@ -186,6 +191,16 @@ ENV;
         }
         
         return $records;
+    }
+
+    private function unifyRecordColumns() {
+        foreach ($this->allRecords as &$record) {
+            foreach ($this->allColumns as $col) {
+                if (!array_key_exists($col, $record)) {
+                    $record[$col] = '';
+                }
+            }
+        }
     }
     
     private function findDuplicateGroups() {
@@ -287,7 +302,7 @@ ENV;
                 $this->stats['aiMerged']++;
                 
                 $progress = round((($index + 1) / $totalGroups) * 100, 1);
-                $this->log("AI Progress: {$progress}% ({$index + 1}/{$totalGroups})", 'debug');
+                $this->log('AI Progress: ' . $progress . '% (' . ($index + 1) . '/' . $totalGroups . ')', 'debug');
                 
             } catch (Exception $e) {
                 $this->log("⚠️  AI merge failed for group, using basic merge: " . $e->getMessage(), 'warning');
@@ -344,8 +359,9 @@ ENV;
         $prompt .= "1. Create the best possible merged entry\n";
         $prompt .= "2. Choose the most accurate and clear term name\n";
         $prompt .= "3. Combine definitions to create one comprehensive, clear definition\n";
-        $prompt .= "4. Include all relevant URLs, separated by semicolons\n";
-        $prompt .= "5. Respond ONLY with valid JSON in this exact format:\n\n";
+        $prompt .= "4. Keep URLs, phone numbers, addresses and other numeric data exactly as provided\n";
+        $prompt .= "5. Include all relevant URLs, separated by semicolons\n";
+        $prompt .= "6. Respond ONLY with valid JSON in this exact format:\n\n";
         
         $prompt .= "{\n";
         $prompt .= "  \"$termCol\": \"merged term here\",\n";
@@ -532,6 +548,7 @@ ENV;
     }
     
     private function generateOutput() {
+        $this->unifyRecordColumns();
         $this->stats['finalUnique'] = count($this->consolidatedRecords);
         
         // Sort alphabetically by term
