@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSV Reconcile – SaaS</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f46e5'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 4h6v4h6v12H6V4zm2 14h8v2H8v-2zm0-4h8v2H8v-2z'/></svg>" />
+  <style>
+    :root {
+      --primary-600: #4f46e5;
+      --primary-500: #6366f1;
+      --primary-100: #e0e7ff;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --success: #10b981;
+      --error: #ef4444;
+      --radius: 12px;
+      --font: 'Inter', system-ui, sans-serif;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--gray-50);
+      color: var(--gray-800);
+      line-height: 1.6;
+    }
+
+    header {
+      background: white;
+      border-bottom: 1px solid var(--gray-200);
+      padding: 1rem 2rem;
+    }
+
+    .header-inner {
+      max-width: 1200px;
+      margin: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: var(--primary-600);
+    }
+
+    .logo svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    nav {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+    }
+
+    nav a {
+      color: var(--gray-500);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    nav a:hover {
+      color: var(--primary-600);
+    }
+
+    main {
+      padding: 3rem 2rem;
+      max-width: 1200px;
+      margin: auto;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      color: var(--gray-800);
+    }
+
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--gray-500);
+      margin-bottom: 2.5rem;
+    }
+
+    .card {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--gray-300);
+      border-radius: var(--radius);
+      padding: 3rem 2rem;
+      text-align: center;
+      transition: border-color 0.2s, background 0.2s;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .drop-zone:hover {
+      border-color: var(--primary-500);
+      background: var(--primary-100);
+    }
+
+    .drop-zone.dragover {
+      border-color: var(--primary-600);
+      background: var(--primary-100);
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .drop-zone svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 1rem;
+      color: var(--gray-400);
+    }
+
+    .drop-zone p {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--gray-700);
+    }
+
+    .drop-zone span {
+      color: var(--gray-500);
+      font-size: 0.875rem;
+    }
+
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      border-radius: var(--radius);
+      background: var(--gray-100);
+      animation: fadeIn 0.3s ease;
+    }
+
+    .file-item svg {
+      width: 24px;
+      height: 24px;
+      color: var(--primary-600);
+    }
+
+    .file-name {
+      flex: 1;
+      font-weight: 500;
+    }
+
+    .remove-file {
+      background: none;
+      border: none;
+      color: var(--gray-500);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .remove-file:hover {
+      color: var(--error);
+    }
+
+    .actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .btn--primary {
+      background: var(--primary-600);
+      color: white;
+    }
+
+    .btn--primary:hover {
+      background: var(--primary-500);
+    }
+
+    .btn--secondary {
+      background: var(--gray-200);
+      color: var(--gray-700);
+    }
+
+    .btn--secondary:hover {
+      background: var(--gray-300);
+    }
+
+    .btn:disabled {
+      background: var(--gray-200);
+      color: var(--gray-400);
+      cursor: not-allowed;
+    }
+
+    .result {
+      display: none;
+    }
+
+    .result.show {
+      display: block;
+    }
+
+    .result h2 {
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+    }
+
+    .result table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    .result th,
+    .result td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .result th {
+      background: var(--gray-100);
+      font-weight: 600;
+    }
+
+    .result tr:hover {
+      background: var(--gray-50);
+    }
+
+    .status {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status.success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .status.warning {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--gray-400);
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 2rem;
+      }
+      .card {
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+          <path
+            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 4h6v4h6v12H6V4zm2 14h8v2H8v-2zm0-4h8v2H8v-2z"
+            fill="currentColor"
+          />
+        </svg>
+        CSV Reconcile
+      </div>
+      <nav>
+        <a href="#">Docs</a>
+        <a href="#">Pricing</a>
+        <button class="btn btn--primary">Sign In</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Reconcile CSV Records in Seconds</h1>
+    <p class="subtitle">Upload multiple CSV files and let our engine merge them into a single clean record.</p>
+
+    <section class="card">
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".csv" multiple />
+        <svg width="48" height="48" fill="none" viewBox="0 0 24 24">
+          <path d="M3 16l4-4 4 4m0-6V4m-4 4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <p>Drag & drop CSV files or <span class="underline">browse</span></p>
+        <span>Up to 100 MB each</span>
+      </div>
+
+      <div class="file-list" id="fileList">
+        <p class="empty-state">No files selected</p>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn--secondary" id="clearBtn">Clear All</button>
+        <button class="btn btn--primary" id="reconcileBtn" disabled>Start Reconciling</button>
+      </div>
+    </section>
+
+    <section class="result" id="result">
+      <h2>Reconciled Records</h2>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Email</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="resultBody">
+            <tr>
+              <td>1</td>
+              <td>alice@example.com</td>
+              <td><span class="status success">Merged</span></td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>bob@example.com</td>
+              <td><span class="status warning">Conflict</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const fileList = document.getElementById('fileList');
+    const reconcileBtn = document.getElementById('reconcileBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const result = document.getElementById('result');
+    const files = [];
+
+    function renderFiles() {
+      fileList.innerHTML = '';
+      if (files.length === 0) {
+        fileList.innerHTML = '<p class="empty-state">No files selected</p>';
+        reconcileBtn.disabled = true;
+        return;
+      }
+      files.forEach((file, index) => {
+        const div = document.createElement('div');
+        div.className = 'file-item';
+        div.innerHTML = `
+          <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 4h6v4h6v12H6V4z" fill="currentColor"/>
+          </svg>
+          <span class="file-name">${file.name}</span>
+          <button class="remove-file" data-index="${index}">×</button>
+        `;
+        fileList.appendChild(div);
+      });
+      reconcileBtn.disabled = files.length < 2;
+    }
+
+    function addFiles(newFiles) {
+      for (const file of newFiles) {
+        if (!file.type.endsWith('csv')) continue;
+        if (!files.some(f => f.name === file.name && f.size === file.size)) {
+          files.push(file);
+        }
+      }
+      renderFiles();
+    }
+
+    fileInput.addEventListener('change', () => addFiles([...fileInput.files]));
+    clearBtn.addEventListener('click', () => {
+      files.length = 0;
+      fileInput.value = '';
+      renderFiles();
+      result.classList.remove('show');
+    });
+
+    dropZone.addEventListener('dragover', e => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      addFiles([...e.dataTransfer.files]);
+    });
+
+    fileList.addEventListener('click', e => {
+      if (e.target.classList.contains('remove-file')) {
+        const index = e.target.dataset.index;
+        files.splice(index, 1);
+        renderFiles();
+      }
+    });
+
+    reconcileBtn.addEventListener('click', () => {
+      // Simulate processing
+      reconcileBtn.textContent = 'Processing…';
+      reconcileBtn.disabled = true;
+      setTimeout(() => {
+        reconcileBtn.textContent = 'Start Reconciling';
+        reconcileBtn.disabled = false;
+        result.classList.add('show');
+        result.scrollIntoView({ behavior: 'smooth' });
+      }, 1500);
+    });
+  </script>
+</body>
+</html>
